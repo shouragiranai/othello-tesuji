@@ -63,8 +63,52 @@ function createBottomNav(active) {
   `;
   nav.querySelector('[data-nav="list"]').addEventListener('click', goList);
   nav.querySelector('[data-nav="review"]').addEventListener('click', goReview);
-  nav.querySelector('[data-nav="editor"]').addEventListener('click', goNewCard);
+  nav.querySelector('[data-nav="editor"]').addEventListener('click', goNewCardChoice);
   return nav;
+}
+
+function renderNewCardChoiceView(app) {
+  const header = document.createElement('header');
+  header.className = 'topbar';
+  header.innerHTML = `
+    <button class="icon-btn" id="btn-back">← 戻る</button>
+    <h1>新規カード</h1>
+    <span></span>
+  `;
+  app.appendChild(header);
+  header.querySelector('#btn-back').addEventListener('click', goList);
+
+  const body = document.createElement('div');
+  body.className = 'scroll-body';
+  body.innerHTML = `<p class="photo-help">作り方を選んでください</p>`;
+
+  const options = [
+    {
+      title: '手動で盤面を作る',
+      desc: '盤面をタップして石を置き、手順を記録します',
+      action: goNewCard,
+    },
+    {
+      title: '盤面を写真から読み取る',
+      desc: '石が置かれた盤面の写真から自動で読み取ります',
+      action: goNewCardViaBoardPhoto,
+    },
+    {
+      title: '棋譜を写真から読み取る',
+      desc: '「F5, D6...」のような手順の写真をOCRで読み取ります',
+      action: goNewCardViaKifuPhoto,
+    },
+  ];
+
+  for (const opt of options) {
+    const btn = document.createElement('button');
+    btn.className = 'choice-card';
+    btn.innerHTML = `<span class="choice-title">${opt.title}</span><span class="choice-desc">${opt.desc}</span>`;
+    btn.addEventListener('click', opt.action);
+    body.appendChild(btn);
+  }
+
+  app.appendChild(body);
 }
 
 // ---------- app state ----------
@@ -89,6 +133,7 @@ function render() {
   const app = document.getElementById('app');
   app.innerHTML = '';
   if (state.view === 'list') renderListView(app);
+  else if (state.view === 'new-card-choice') renderNewCardChoiceView(app);
   else if (state.view === 'editor') renderEditorView(app);
   else if (state.view === 'detail') renderDetailView(app);
   else if (state.view === 'review') renderReviewView(app);
@@ -139,10 +184,25 @@ function createEditorStateFromCard(card) {
   };
 }
 
+function goNewCardChoice() {
+  state.view = 'new-card-choice';
+  render();
+}
+
 function goNewCard() {
   state.editor = createNewEditorState();
   state.view = 'editor';
   render();
+}
+
+function goNewCardViaBoardPhoto() {
+  state.editor = createNewEditorState();
+  goPhotoBoardImport();
+}
+
+function goNewCardViaKifuPhoto() {
+  state.editor = createNewEditorState();
+  goPhotoKifuImport();
 }
 
 function goEditCard(id) {
