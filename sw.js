@@ -1,4 +1,4 @@
-const CACHE_NAME = 'othello-tesuji-v3';
+const CACHE_NAME = 'othello-tesuji-v4';
 const APP_SHELL = [
   './',
   'index.html',
@@ -10,7 +10,7 @@ const APP_SHELL = [
   'js/board-ui.js',
   'js/homography.js',
   'js/board-photo-import.js',
-  'js/kifu-photo-import.js',
+  'js/kifu-text-import.js',
   'js/app.js',
   'icons/icon-192.png',
   'icons/icon-512.png',

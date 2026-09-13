@@ -94,9 +94,9 @@ function renderNewCardChoiceView(app) {
       action: goNewCardViaBoardPhoto,
     },
     {
-      title: '棋譜を写真から読み取る',
-      desc: '「F5, D6...」のような手順の写真をOCRで読み取ります',
-      action: goNewCardViaKifuPhoto,
+      title: '棋譜をテキストから読み込む',
+      desc: '「F5, D6...」のような手順を貼り付けて読み込みます',
+      action: goNewCardViaKifuText,
     },
   ];
 
@@ -138,7 +138,7 @@ function render() {
   else if (state.view === 'detail') renderDetailView(app);
   else if (state.view === 'review') renderReviewView(app);
   else if (state.view === 'photo-board') renderBoardPhotoImportView(app);
-  else if (state.view === 'photo-kifu') renderKifuPhotoImportView(app);
+  else if (state.view === 'kifu-text-import') renderKifuTextImportView(app);
 }
 
 // ---------- navigation ----------
@@ -200,9 +200,9 @@ function goNewCardViaBoardPhoto() {
   goPhotoBoardImport();
 }
 
-function goNewCardViaKifuPhoto() {
+function goNewCardViaKifuText() {
   state.editor = createNewEditorState();
-  goPhotoKifuImport();
+  goKifuTextImport();
 }
 
 function goEditCard(id) {
@@ -232,9 +232,9 @@ function goPhotoBoardImport() {
   render();
 }
 
-function goPhotoKifuImport() {
-  state.photoImport = { type: 'kifu', step: 'pick', imageEl: null, movesText: '', error: null, progress: 0 };
-  state.view = 'photo-kifu';
+function goKifuTextImport() {
+  state.photoImport = { type: 'kifu-text', movesText: '', error: null };
+  state.view = 'kifu-text-import';
   render();
 }
 
@@ -543,7 +543,7 @@ function renderEditorView(app) {
       </div>
       <div class="control-group button-row">
         <button class="text-btn" id="btn-photo-board">盤面を写真から読取</button>
-        <button class="text-btn" id="btn-photo-kifu">棋譜を写真から読取</button>
+        <button class="text-btn" id="btn-photo-kifu">棋譜をテキストから読込</button>
       </div>
       <button class="primary-btn" id="btn-start-moves">この配置から手順を記録する</button>
     `;
@@ -589,7 +589,7 @@ function renderEditorView(app) {
     controls.querySelector('#btn-standard').addEventListener('click', resetToStandardStart);
     controls.querySelector('#btn-clear').addEventListener('click', clearEditorBoard);
     controls.querySelector('#btn-photo-board').addEventListener('click', goPhotoBoardImport);
-    controls.querySelector('#btn-photo-kifu').addEventListener('click', goPhotoKifuImport);
+    controls.querySelector('#btn-photo-kifu').addEventListener('click', goKifuTextImport);
     controls.querySelector('#btn-start-moves').addEventListener('click', startRecordingMoves);
   } else {
     controls.querySelector('#btn-undo').addEventListener('click', undoLastMove);
