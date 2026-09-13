@@ -545,6 +545,7 @@ textarea {
   position: relative;
   margin: 0 auto;
   touch-action: none;
+  flex-shrink: 0;
 }
 
 .photo-stage canvas {

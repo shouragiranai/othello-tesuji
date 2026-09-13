@@ -165,7 +165,10 @@ function loadImageFile(file, onLoaded) {
 function setupPhotoAdjustStage(stage, canvas, pi, onConfirm, confirmBtn) {
   const img = pi.imageEl;
   const maxW = Math.min(460, window.innerWidth - 32);
-  const scale = maxW / img.naturalWidth;
+  // Also cap by available height so a tall portrait photo doesn't grow the stage
+  // past the viewport (leaving no room for the confirm button below it).
+  const maxH = Math.max(200, window.innerHeight - 260);
+  const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight);
   const dispW = Math.round(img.naturalWidth * scale);
   const dispH = Math.round(img.naturalHeight * scale);
   canvas.width = dispW;
