@@ -227,7 +227,7 @@ function goReview() {
 }
 
 function goPhotoBoardImport() {
-  state.photoImport = { type: 'board', step: 'pick', imageEl: null, corners: null };
+  state.photoImport = { type: 'board', step: 'pick', imageEl: null, corners: null, autoGuessed: false };
   state.view = 'photo-board';
   render();
 }

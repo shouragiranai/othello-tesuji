@@ -14,6 +14,109 @@ function defaultNormalizedCorners() {
   };
 }
 
+function quantizeChannel(v) {
+  return Math.round(v / 24) * 24;
+}
+
+// Best-effort guess at the board's outer edges: finds the most common non-extreme
+// color in the photo (the board surface -- stones are excluded by luminance,
+// since they sit near pure black/white) and returns the bounding box of pixels
+// close to that color. Returns null when no clearly dominant region is found, so
+// the caller can fall back to a generic centered box for manual adjustment.
+function guessBoardCorners(imageEl) {
+  const w = imageEl.naturalWidth;
+  const h = imageEl.naturalHeight;
+  const scale = Math.min(1, 300 / Math.max(w, h));
+  const sw = Math.max(1, Math.round(w * scale));
+  const sh = Math.max(1, Math.round(h * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = sw;
+  canvas.height = sh;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(imageEl, 0, 0, sw, sh);
+  const data = ctx.getImageData(0, 0, sw, sh).data;
+
+  return computeDominantColorBox(data, sw, sh);
+}
+
+// Pure pixel-analysis core of guessBoardCorners, separated out so it can run
+// against any RGBA buffer (real photo or synthetic test data) without needing an
+// actual <canvas>.
+function computeDominantColorBox(data, sw, sh) {
+  // Phase 1: find the dominant "board" color using only a central crop. A
+  // photographed board is usually centered in frame, so even when background is
+  // visible near the edges, the middle of the photo is reliably board surface --
+  // sampling the whole image here would let a large background area outvote a
+  // smaller, off-center board.
+  const cropX0 = Math.floor(sw * 0.25);
+  const cropX1 = Math.ceil(sw * 0.75);
+  const cropY0 = Math.floor(sh * 0.25);
+  const cropY1 = Math.ceil(sh * 0.75);
+
+  const buckets = new Map();
+  for (let y = cropY0; y < cropY1; y++) {
+    for (let x = cropX0; x < cropX1; x++) {
+      const i = (y * sw + x) * 4;
+      const r = quantizeChannel(data[i]);
+      const g = quantizeChannel(data[i + 1]);
+      const b = quantizeChannel(data[i + 2]);
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (lum < 35 || lum > 220) continue;
+      const key = r + ',' + g + ',' + b;
+      buckets.set(key, (buckets.get(key) || 0) + 1);
+    }
+  }
+  if (buckets.size === 0) return null;
+
+  let bestKey = null;
+  let bestCount = 0;
+  for (const [key, count] of buckets) {
+    if (count > bestCount) {
+      bestCount = count;
+      bestKey = key;
+    }
+  }
+  const cropArea = (cropX1 - cropX0) * (cropY1 - cropY0);
+  if (bestCount < cropArea * 0.15) return null;
+
+  // Phase 2: use that seed color to find the board's full extent across the
+  // whole image (it will usually reach past the central crop toward the edges).
+  const seed = bestKey.split(',').map(Number);
+  const threshold = 55;
+  const xs = [];
+  const ys = [];
+  for (let y = 0; y < sh; y++) {
+    for (let x = 0; x < sw; x++) {
+      const i = (y * sw + x) * 4;
+      const dr = data[i] - seed[0];
+      const dg = data[i + 1] - seed[1];
+      const db = data[i + 2] - seed[2];
+      if (Math.sqrt(dr * dr + dg * dg + db * db) <= threshold) {
+        xs.push(x);
+        ys.push(y);
+      }
+    }
+  }
+  if (xs.length < sw * sh * 0.04) return null;
+
+  xs.sort((a, b) => a - b);
+  ys.sort((a, b) => a - b);
+  const pct = (arr, p) => arr[Math.max(0, Math.min(arr.length - 1, Math.floor((arr.length - 1) * p)))];
+  const x0 = pct(xs, 0.02) / sw;
+  const x1 = pct(xs, 0.98) / sw;
+  const y0 = pct(ys, 0.02) / sh;
+  const y1 = pct(ys, 0.98) / sh;
+  if (x1 - x0 < 0.15 || y1 - y0 < 0.15) return null;
+
+  return {
+    tl: { x: x0, y: y0 },
+    tr: { x: x1, y: y0 },
+    br: { x: x1, y: y1 },
+    bl: { x: x0, y: y1 },
+  };
+}
+
 // Samples the 64 cell centers of the quadrilateral (normCorners, normalized 0-1
 // against the image) via a homography, then classifies each by luminance relative
 // to the darkest/lightest cells detected (board felt sits in between the two stone
@@ -121,13 +224,17 @@ function renderBoardPhotoImportView(app) {
       if (!file) return;
       loadImageFile(file, (img) => {
         pi.imageEl = img;
-        pi.corners = defaultNormalizedCorners();
+        const guessed = guessBoardCorners(img);
+        pi.corners = guessed || defaultNormalizedCorners();
+        pi.autoGuessed = !!guessed;
         pi.step = 'adjust';
         render();
       });
     });
   } else if (pi.step === 'adjust') {
-    body.innerHTML = `<p class="photo-help">4つの丸を盤面の外枠（8×8マスの角）に合わせてください。</p>`;
+    body.innerHTML = `<p class="photo-help">${pi.autoGuessed
+      ? '自動で枠を推定しました。ずれていれば4つの丸をドラッグして盤面の外枠（8×8マスの角）に合わせてください。'
+      : '自動認識できなかったため、4つの丸を盤面の外枠（8×8マスの角）に合わせてください。'}</p>`;
     const stage = document.createElement('div');
     stage.className = 'photo-stage';
     const canvas = document.createElement('canvas');

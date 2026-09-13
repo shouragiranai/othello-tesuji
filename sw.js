@@ -1,4 +1,4 @@
-const CACHE_NAME = 'othello-tesuji-v6';
+const CACHE_NAME = 'othello-tesuji-v7';
 const APP_SHELL = [
   './',
   'index.html',
