@@ -80,6 +80,12 @@ function idxToNotation(idx) {
   return String.fromCharCode(65 + col) + (row + 1);
 }
 
+function notationToIdx(notation) {
+  const col = notation.toUpperCase().charCodeAt(0) - 65;
+  const row = Number(notation.slice(1)) - 1;
+  return row * 8 + col;
+}
+
 function boardToString(board) {
   return board.join('');
 }

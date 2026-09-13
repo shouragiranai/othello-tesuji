@@ -78,6 +78,7 @@ const state = {
   detailStep: null,
   listFilter: 'all',
   listSort: 'due',
+  photoImport: null,
 };
 
 function persist() {
@@ -91,6 +92,8 @@ function render() {
   else if (state.view === 'editor') renderEditorView(app);
   else if (state.view === 'detail') renderDetailView(app);
   else if (state.view === 'review') renderReviewView(app);
+  else if (state.view === 'photo-board') renderBoardPhotoImportView(app);
+  else if (state.view === 'photo-kifu') renderKifuPhotoImportView(app);
 }
 
 // ---------- navigation ----------
@@ -160,6 +163,24 @@ function goDetail(id) {
 function goReview() {
   state.review = null;
   state.view = 'review';
+  render();
+}
+
+function goPhotoBoardImport() {
+  state.photoImport = { type: 'board', step: 'pick', imageEl: null, corners: null };
+  state.view = 'photo-board';
+  render();
+}
+
+function goPhotoKifuImport() {
+  state.photoImport = { type: 'kifu', step: 'pick', imageEl: null, movesText: '', error: null, progress: 0 };
+  state.view = 'photo-kifu';
+  render();
+}
+
+function cancelPhotoImport() {
+  state.photoImport = null;
+  state.view = 'editor';
   render();
 }
 
@@ -460,6 +481,10 @@ function renderEditorView(app) {
         <button class="text-btn" id="btn-standard">標準配置</button>
         <button class="text-btn" id="btn-clear">全消去</button>
       </div>
+      <div class="control-group button-row">
+        <button class="text-btn" id="btn-photo-board">盤面を写真から読取</button>
+        <button class="text-btn" id="btn-photo-kifu">棋譜を写真から読取</button>
+      </div>
       <button class="primary-btn" id="btn-start-moves">この配置から手順を記録する</button>
     `;
   } else {
@@ -503,6 +528,8 @@ function renderEditorView(app) {
     });
     controls.querySelector('#btn-standard').addEventListener('click', resetToStandardStart);
     controls.querySelector('#btn-clear').addEventListener('click', clearEditorBoard);
+    controls.querySelector('#btn-photo-board').addEventListener('click', goPhotoBoardImport);
+    controls.querySelector('#btn-photo-kifu').addEventListener('click', goPhotoKifuImport);
     controls.querySelector('#btn-start-moves').addEventListener('click', startRecordingMoves);
   } else {
     controls.querySelector('#btn-undo').addEventListener('click', undoLastMove);
