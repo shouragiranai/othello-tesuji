@@ -537,11 +537,8 @@ textarea {
   line-height: 1.6;
 }
 
-.photo-file-input {
-  display: block;
-  width: 100%;
-  color: var(--text-dim);
-  font-size: 13px;
+.hidden-file-input {
+  display: none;
 }
 
 .photo-stage {

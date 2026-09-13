@@ -102,14 +102,22 @@ function renderBoardPhotoImportView(app) {
 
   if (pi.step === 'pick') {
     body.innerHTML = `<p class="photo-help">盤面全体が写った写真を選んでください。斜めの写真でも次の画面で4隅を指定すれば補正できます。</p>`;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.capture = 'environment';
-    input.className = 'photo-file-input';
-    body.appendChild(input);
-    input.addEventListener('change', () => {
-      const file = input.files[0];
+
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'file';
+    hiddenInput.accept = 'image/*';
+    hiddenInput.className = 'hidden-file-input';
+    body.appendChild(hiddenInput);
+
+    const pickBtn = document.createElement('button');
+    pickBtn.type = 'button';
+    pickBtn.className = 'primary-btn';
+    pickBtn.textContent = '写真を選ぶ';
+    body.appendChild(pickBtn);
+
+    pickBtn.addEventListener('click', () => hiddenInput.click());
+    hiddenInput.addEventListener('change', () => {
+      const file = hiddenInput.files[0];
       if (!file) return;
       loadImageFile(file, (img) => {
         pi.imageEl = img;
