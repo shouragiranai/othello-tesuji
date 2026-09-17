@@ -248,6 +248,15 @@ button {
   pointer-events: none;
 }
 
+.wrong-move::after {
+  content: '';
+  position: absolute;
+  inset: 8%;
+  border: 2px solid var(--danger);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
 .stone-dot {
   display: inline-block;
   width: 12px;

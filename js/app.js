@@ -247,7 +247,40 @@ function cancelPhotoImport() {
 function buildReviewSession() {
   const due = state.cards.filter((c) => c.srs.due <= Date.now());
   due.sort((a, b) => a.srs.due - b.srs.due);
-  return { queue: due.map((c) => c.id), index: 0, showAnswer: false, step: 0 };
+  return {
+    queue: due.map((c) => c.id),
+    index: 0,
+    quizStep: 0,
+    revealed: false,
+    mistakeMade: false,
+    wrongFeedback: null,
+    step: 0,
+  };
+}
+
+function resetReviewCardState(session) {
+  session.quizStep = 0;
+  session.revealed = false;
+  session.mistakeMade = false;
+  session.wrongFeedback = null;
+  session.step = 0;
+}
+
+function handleQuizCellClick(session, card, idx) {
+  const correctIdx = card.moves[session.quizStep].pos;
+  if (idx === correctIdx) {
+    showToast('正解!');
+    session.quizStep += 1;
+    if (session.quizStep >= card.moves.length) {
+      session.revealed = true;
+      session.step = card.moves.length;
+    }
+    render();
+  } else {
+    session.mistakeMade = true;
+    session.wrongFeedback = { guessedIdx: idx, correctIdx };
+    render();
+  }
 }
 
 // ---------- editor actions ----------
@@ -787,7 +820,6 @@ function renderReviewView(app) {
 
   const initialBoard = boardFromString(card.initialBoard);
   const steps = replayMoves(initialBoard, card.moves);
-  const stepIdx = session.showAnswer ? Math.min(session.step, steps.length - 1) : 0;
 
   const header = document.createElement('header');
   header.className = 'topbar';
@@ -800,9 +832,92 @@ function renderReviewView(app) {
   const body = document.createElement('div');
   body.className = 'scroll-body';
 
+  if (session.wrongFeedback) {
+    renderReviewWrongFeedback(body, session, card, steps);
+  } else if (!session.revealed) {
+    renderReviewQuizStep(body, session, card, steps);
+  } else {
+    renderReviewReveal(body, session, card, steps);
+  }
+
+  app.appendChild(body);
+  header.querySelector('#btn-exit-review').addEventListener('click', () => {
+    state.review = null;
+    goList();
+  });
+}
+
+function renderReviewQuizStep(body, session, card, steps) {
+  const quizStep = session.quizStep;
+  const board = steps[quizStep].board;
+  const player = card.moves[quizStep].player;
+  const legalMoves = getLegalMoves(board, player);
+
   const turnRow = document.createElement('div');
   turnRow.className = 'turn-indicator';
-  turnRow.innerHTML = `<span class="stone-dot ${card.initialTurn === BLACK ? 'stone-black' : 'stone-white'}"></span> ${turnText(card.initialTurn)}で最善手は？`;
+  turnRow.innerHTML = `<span class="stone-dot ${player === BLACK ? 'stone-black' : 'stone-white'}"></span> ${turnText(player)}で最善手を打ってみましょう（${quizStep + 1}手目 / ${card.moves.length}手中）`;
+  body.appendChild(turnRow);
+
+  const boardContainer = document.createElement('div');
+  boardContainer.className = 'board-container';
+  mountBoard(boardContainer, board, {
+    interactive: true,
+    legalMoves,
+    onCellClick: (idx) => handleQuizCellClick(session, card, idx),
+  });
+  body.appendChild(boardContainer);
+
+  const giveUpBtn = document.createElement('button');
+  giveUpBtn.className = 'text-btn';
+  giveUpBtn.textContent = 'わからない（答えを見る）';
+  giveUpBtn.addEventListener('click', () => {
+    session.mistakeMade = true;
+    session.wrongFeedback = { guessedIdx: null, correctIdx: card.moves[quizStep].pos };
+    render();
+  });
+  body.appendChild(giveUpBtn);
+}
+
+function renderReviewWrongFeedback(body, session, card, steps) {
+  const quizStep = session.quizStep;
+  const board = steps[quizStep].board;
+  const { guessedIdx, correctIdx } = session.wrongFeedback;
+
+  const msg = document.createElement('p');
+  msg.className = 'import-error';
+  msg.textContent = guessedIdx === null
+    ? `正解は ${idxToNotation(correctIdx)} でした。`
+    : `不正解です（${idxToNotation(guessedIdx)}をタップ）。正解は ${idxToNotation(correctIdx)} でした。`;
+  body.appendChild(msg);
+
+  const boardContainer = document.createElement('div');
+  boardContainer.className = 'board-container';
+  mountBoard(boardContainer, board, { lastMoveIdx: correctIdx, wrongIdx: guessedIdx });
+  body.appendChild(boardContainer);
+
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'primary-btn';
+  nextBtn.textContent = '続きを見る';
+  nextBtn.addEventListener('click', () => {
+    session.wrongFeedback = null;
+    session.revealed = true;
+    session.step = steps.length - 1;
+    render();
+  });
+  body.appendChild(nextBtn);
+}
+
+function renderReviewReveal(body, session, card, steps) {
+  const stepIdx = Math.min(session.step, steps.length - 1);
+
+  const resultMsg = document.createElement('p');
+  resultMsg.className = 'photo-help';
+  resultMsg.textContent = session.mistakeMade ? '正解の手順を確認しましょう。' : '全問正解です!';
+  body.appendChild(resultMsg);
+
+  const turnRow = document.createElement('div');
+  turnRow.className = 'turn-indicator';
+  turnRow.innerHTML = `<span class="stone-dot ${card.initialTurn === BLACK ? 'stone-black' : 'stone-white'}"></span> 初期手番: ${turnText(card.initialTurn)}`;
   body.appendChild(turnRow);
 
   const boardContainer = document.createElement('div');
@@ -810,84 +925,65 @@ function renderReviewView(app) {
   mountBoard(boardContainer, steps[stepIdx].board, { lastMoveIdx: steps[stepIdx].moveIdx });
   body.appendChild(boardContainer);
 
-  if (!session.showAnswer) {
-    const showBtn = document.createElement('button');
-    showBtn.className = 'primary-btn';
-    showBtn.textContent = '解答を見る';
-    showBtn.addEventListener('click', () => {
-      session.showAnswer = true;
-      session.step = steps.length - 1;
-      render();
-    });
-    body.appendChild(showBtn);
-  } else {
-    const playback = document.createElement('div');
-    playback.className = 'playback-controls';
-    playback.innerHTML = `
-      <button id="step-first" ${stepIdx === 0 ? 'disabled' : ''}>|◀</button>
-      <button id="step-prev" ${stepIdx === 0 ? 'disabled' : ''}>◀</button>
-      <span class="step-label">${stepIdx} / ${steps.length - 1}</span>
-      <button id="step-next" ${stepIdx === steps.length - 1 ? 'disabled' : ''}>▶</button>
-      <button id="step-last" ${stepIdx === steps.length - 1 ? 'disabled' : ''}>▶|</button>
-    `;
-    body.appendChild(playback);
+  const playback = document.createElement('div');
+  playback.className = 'playback-controls';
+  playback.innerHTML = `
+    <button id="step-first" ${stepIdx === 0 ? 'disabled' : ''}>|◀</button>
+    <button id="step-prev" ${stepIdx === 0 ? 'disabled' : ''}>◀</button>
+    <span class="step-label">${stepIdx} / ${steps.length - 1}</span>
+    <button id="step-next" ${stepIdx === steps.length - 1 ? 'disabled' : ''}>▶</button>
+    <button id="step-last" ${stepIdx === steps.length - 1 ? 'disabled' : ''}>▶|</button>
+  `;
+  body.appendChild(playback);
 
-    const movesText = document.createElement('div');
-    movesText.className = 'moves-text';
-    movesText.textContent = formatMovesText(card.moves);
-    body.appendChild(movesText);
+  const movesText = document.createElement('div');
+  movesText.className = 'moves-text';
+  movesText.textContent = formatMovesText(card.moves);
+  body.appendChild(movesText);
 
-    if (card.note) {
-      const noteEl = document.createElement('p');
-      noteEl.className = 'note-text';
-      noteEl.textContent = card.note;
-      body.appendChild(noteEl);
-    }
-
-    const ratingRow = document.createElement('div');
-    ratingRow.className = 'rating-buttons';
-    ratingRow.innerHTML = `
-      <button data-q="0" class="rating-again">もう一度</button>
-      <button data-q="3" class="rating-hard">難しい</button>
-      <button data-q="4" class="rating-good">普通</button>
-      <button data-q="5" class="rating-easy">簡単</button>
-    `;
-    body.appendChild(ratingRow);
-
-    playback.querySelector('#step-first').addEventListener('click', () => {
-      session.step = 0;
-      render();
-    });
-    playback.querySelector('#step-prev').addEventListener('click', () => {
-      session.step = Math.max(0, stepIdx - 1);
-      render();
-    });
-    playback.querySelector('#step-next').addEventListener('click', () => {
-      session.step = Math.min(steps.length - 1, stepIdx + 1);
-      render();
-    });
-    playback.querySelector('#step-last').addEventListener('click', () => {
-      session.step = steps.length - 1;
-      render();
-    });
-
-    ratingRow.querySelectorAll('button').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const quality = Number(btn.dataset.q);
-        card.srs = scheduleReview(card.srs, quality);
-        persist();
-        session.index++;
-        session.showAnswer = false;
-        session.step = 0;
-        render();
-      });
-    });
+  if (card.note) {
+    const noteEl = document.createElement('p');
+    noteEl.className = 'note-text';
+    noteEl.textContent = card.note;
+    body.appendChild(noteEl);
   }
 
-  app.appendChild(body);
-  header.querySelector('#btn-exit-review').addEventListener('click', () => {
-    state.review = null;
-    goList();
+  const ratingRow = document.createElement('div');
+  ratingRow.className = 'rating-buttons';
+  ratingRow.innerHTML = `
+    <button data-q="0" class="rating-again">もう一度</button>
+    <button data-q="3" class="rating-hard">難しい</button>
+    <button data-q="4" class="rating-good">普通</button>
+    <button data-q="5" class="rating-easy">簡単</button>
+  `;
+  body.appendChild(ratingRow);
+
+  playback.querySelector('#step-first').addEventListener('click', () => {
+    session.step = 0;
+    render();
+  });
+  playback.querySelector('#step-prev').addEventListener('click', () => {
+    session.step = Math.max(0, stepIdx - 1);
+    render();
+  });
+  playback.querySelector('#step-next').addEventListener('click', () => {
+    session.step = Math.min(steps.length - 1, stepIdx + 1);
+    render();
+  });
+  playback.querySelector('#step-last').addEventListener('click', () => {
+    session.step = steps.length - 1;
+    render();
+  });
+
+  ratingRow.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const quality = Number(btn.dataset.q);
+      card.srs = scheduleReview(card.srs, quality);
+      persist();
+      session.index++;
+      resetReviewCardState(session);
+      render();
+    });
   });
 }
 

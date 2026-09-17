@@ -4,6 +4,7 @@ function createBoardElement(board, options = {}) {
     onCellClick = null,
     legalMoves = [],
     lastMoveIdx = null,
+    wrongIdx = null,
     size = null,
   } = options;
 
@@ -29,6 +30,7 @@ function createBoardElement(board, options = {}) {
     }
 
     if (lastMoveIdx === idx) cell.classList.add('last-move');
+    if (wrongIdx === idx) cell.classList.add('wrong-move');
 
     if (interactive && onCellClick) {
       cell.addEventListener('click', () => onCellClick(idx));
